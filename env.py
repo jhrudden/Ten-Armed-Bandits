@@ -5,13 +5,19 @@ from typing import Tuple
 class BanditEnv:
     """Multi-armed bandit environment"""
 
-    def __init__(self, k: int) -> None:
+    def __init__(self, k: int, random_state: float = None) -> None:
         """__init__.
 
         Args:
             k (int): number of arms/bandits
+            random_state (float): random seed
         """
         self.k = k
+        
+        if random_state is not None:
+            np.random.seed(random_state)
+
+        self.reset()
 
     def reset(self) -> None:
         """Resets the mean payout/reward of each arm.
@@ -26,7 +32,6 @@ class BanditEnv:
         Args:
             action (int): index of arm to pull
         """
-        # TODO calculate reward of arm given by action
-        reward = None
+        reward = np.random.normal(loc=self.means[action])
 
         return reward
