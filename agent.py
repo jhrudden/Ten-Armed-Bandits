@@ -4,19 +4,24 @@ from typing import Optional, Sequence
 
 
 def argmax(arr: Sequence[float]) -> int:
-    """Argmax that breaks ties randomly
+    """
+    Argmax that breaks ties randomly (np.argmax only returns first index in case of ties, we don't like this)
 
-    Takes in a list of values and returns the index of the item with the highest value, breaking ties randomly.
-
-    Note: np.argmax returns the first index that matches the maximum, so we define this method to use in EpsilonGreedy and UCB agents.
     Args:
         arr: sequence of values
+    
+    Returns:
+        index of maximum value
     """
-    # TODO
-    pass
-
+    max_val = np.max(arr)
+    max_indices = np.where(arr == max_val)[0]
+    return np.random.choice(max_indices)
 
 class BanditAgent(ABC):
+    Q = None # Q-values #   
+    N = None # Number of times each arm was pulled
+    t = None # Number of time steps taken
+
     def __init__(self, k: int, init: int, step_size: float) -> None:
         """Abstract bandit agent class
 
@@ -30,18 +35,11 @@ class BanditAgent(ABC):
         self.k = k
         self.init = init
         self.step_size = step_size
-
-        # Q-values for each arm
-        self.Q = None
-        # Number of times each arm was pulled
-        self.N = None
-        # Current total number of steps
-        self.t = None
+        self.reset()
 
     def reset(self) -> None:
-        """Initialize or reset Q-values and counts
-
-        This method should be called after __init__() at least once
+        """
+        Initialize or reset Q-values, counts and time step
         """
         self.Q = self.init * np.ones(self.k, dtype=np.float32)
         self.N = np.zeros(self.k, dtype=int)
@@ -79,16 +77,27 @@ class EpsilonGreedy(BanditAgent):
         self.epsilon = epsilon
 
     def choose_action(self):
-        """Choose which arm to pull
-
-        With probability 1 - epsilon, choose the best action (break ties arbitrarily, use argmax() from above). With probability epsilon, choose a random action.
         """
-        # TODO
-        action = None
-        return action
+        Choose which arm to pull.
+
+        (1-epsilon) of the time, choose the arm with the highest Q-value (argmax(Q)) (break ties randomly).
+        epsilon of the time, choose a random arm uniformly
+
+        Returns:
+            action (int): index of arm to pull
+        """
+        random_val = np.random.uniform()
+        # explore (random action)
+        if random_val < self.epsilon:
+            return np.random.randint(self.k)
+        
+        # exploit (greedy action)
+        return argmax(self.Q)
+
 
     def update(self, action: int, reward: float) -> None:
-        """Update Q-values and N after observing reward.
+        """
+        Update Q-values and N after observing reward.
 
         Args:
             action (int): index of pulled arm
@@ -96,15 +105,17 @@ class EpsilonGreedy(BanditAgent):
         """
         self.t += 1
 
-        # TODO update self.N
+        self.N[action] += 1
 
-        # TODO update self.Q
-        # If step_size is given (static step size)
+        step_ceof = 1 / self.N[action]
+
         if self.step_size is not None:
-            pass
-        # If step_size is dynamic (step_size = 1 / N(a))
-        else:
-            pass
+            step_ceof = self.step_size
+        
+        self.Q[action] += step_ceof * (reward - self.Q[action])
+
+    def __str__(self) -> str:
+        return f"$\epsilon = {self.epsilon}$"
 
 
 class UCB(BanditAgent):
