@@ -1,11 +1,11 @@
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Optional
 
 
 class BanditEnv:
     """Multi-armed bandit environment"""
 
-    def __init__(self, k: int, random_state: float = None) -> None:
+    def __init__(self, k: int, random_state: Optional[float] = None) -> None:
         """__init__.
 
         Args:
