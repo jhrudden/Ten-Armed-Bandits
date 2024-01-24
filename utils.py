@@ -91,33 +91,62 @@ def run_simulation(agents: Sequence[BanditAgent], env: BanditEnv, n_steps: int, 
                 data["rewards"][i, j, t] = reward
     return data
 
-def plot_optimal_action(data: np.ndarray, num_steps: int, agent_labels: Sequence[str]):
+def plot_optimal_action(data: np.ndarray, agent_labels: Sequence[str], alpha: float = 0.2, z_val: float = 1.96):
     """
     Plot the percentage of optimal actions taken over time
 
     Args:
         data (np.ndarray): data from simulation
-        num_steps (int): number of steps to run
         agent_labels (Sequence[str]): labels for each agent
+        alpha (float): transparency of the shaded region
+        z_val (float): z-value for confidence interval
     """
-    for a in range(len(agent_labels)):
-        optimal_action_percentage = np.cumsum(np.mean(data[a], axis=0)) / np.arange(1, num_steps + 1)
+    n_agents, n_trials, n_steps = data.shape
+
+    assert n_agents == len(agent_labels), "Number of agents and labels must match"
+
+    for a in range(n_agents):
+        scaled_data = data[a] * 100
+        optimal_action_percentage = np.mean(scaled_data, axis=0)
+        std_per_step = np.std(scaled_data, axis=0)
+        margin_of_error = z_val * std_per_step / np.sqrt(n_steps)
+        plt.fill_between(
+            range(n_steps),
+            optimal_action_percentage - margin_of_error,
+            optimal_action_percentage + margin_of_error,
+            alpha=alpha,
+        )
         plt.plot(optimal_action_percentage, label=agent_labels[a])
     plt.xlabel('Steps')
     plt.ylabel('% Optimal Action Taken')
 
-def plot_average_reward(data: np.ndarray, num_steps: int, agent_labels: Sequence[str]):
+# TODO: what should the upper bound be?
+def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bound: float, alpha: float = 0., z_val: float = 1.96):
     """
     Plot the average reward over time
 
     Args:
-        axes (Axes): matplotlib axes object
         data (np.ndarray): data from simulation
-        num_steps (int): number of steps to run
         agent_labels (Sequence[str]): labels for each agent
+        upper_bound (float): upper bound associated with highest possible 
+        alpha (float): transparency of the shaded region
+        z_val (float): z-value for confidence interval
     """
-    for a in range(len(agent_labels)):
-        average_reward = np.mean(data[a], axis=0)
-        plt.plot(average_reward, label=agent_labels[a])
+    n_agents, n_trials, n_steps = data.shape
+
+    assert n_agents == len(agent_labels), "Number of agents and labels must match"
+
+    for a in range(n_agents):
+        average_reward_per_step = np.mean(data[a], axis=0)
+        std_per_step = np.std(data[a], axis=0)
+        margin_of_error = z_val * std_per_step / np.sqrt(n_steps)
+        plt.fill_between(
+            range(n_steps),
+            average_reward_per_step - margin_of_error,
+            average_reward_per_step + margin_of_error,
+            alpha=alpha,
+        )
+        plt.plot(average_reward_per_step, label=agent_labels[a])
+
     plt.xlabel('Steps')
     plt.ylabel('Average Reward')
