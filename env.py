@@ -15,16 +15,16 @@ class BanditEnv:
         """
         self.k = k
         self.stationary = stationary
-        
-        if random_state is not None:
-            np.random.seed(random_state)
 
         self.reset()
 
-    def reset(self) -> None:
+    def reset(self, random_state: Optional[float] = None) -> None:
         """Resets the mean payout/reward of each arm.
         This function should be called at least once after __init__()
         """
+        if random_state is not None:
+            self.random_state = random_state
+            np.random.seed(self.random_state)
         if self.stationary:
             # Initialize means of each arm distributed according to standard normal
             self.means = np.random.normal(size=self.k)
