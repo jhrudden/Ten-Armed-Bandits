@@ -94,7 +94,7 @@ def run_simulation(agents: Sequence[BanditAgent], env: BanditEnv, n_steps: int, 
     for j in trange(n_trials):
         for i, agent in enumerate(agents):
             agent.reset()
-            env.reset()
+            env.reset(random_state=j)
 
             if stationary:
                 optimal_action = np.argmax(env.means)
@@ -114,7 +114,9 @@ def run_simulation(agents: Sequence[BanditAgent], env: BanditEnv, n_steps: int, 
                     data["took_optimal_action"][i, j, t] = 1
 
                 data["rewards"][i, j, t] = reward
+
     data['upper_bounds'] = upper_bounds
+
     return data
 
 def plot_optimal_action(data: np.ndarray, agent_labels: Sequence[str], alpha: float = 0.2, z_val: float = 1.96, save_path: Optional[str] = None, figsize: Optional[Sequence[int]] = (20,10)):
@@ -160,7 +162,7 @@ def plot_optimal_action(data: np.ndarray, agent_labels: Sequence[str], alpha: fl
     plt.show()
 
 # TODO: what should the upper bound be?
-def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bounds: Union[np.ndarray, float], alpha: float = 0.0, z_val: float = 1.96, stationary: bool = True, save_path: Optional[str] = None, figsize: Optional[Sequence[int]] = (20,10)):
+def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bounds: Union[np.ndarray, float], alpha: float = 0.0, z_val: float = 1.96, save_path: Optional[str] = None, figsize: Optional[Sequence[int]] = (20,10)):
     """
     Plot the average reward over time
 
@@ -195,7 +197,7 @@ def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bou
             color=series.get_color()
         )
 
-    upper_bound_mean = np.mean(upper_bounds, axis=None if stationary else 0)
+    upper_bound_mean = np.mean(upper_bounds, axis=0)
     upper_bound_std = np.std(upper_bounds)
     margin_of_error_upper = z_val * upper_bound_std / np.sqrt(n_trials)
 
@@ -206,10 +208,8 @@ def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bou
         alpha=alpha,
         color='gray'
     )
-    if stationary:
-        plt.hlines(upper_bound_mean, 0, n_steps, color='black', linestyle='dashed', label='Upper Bound')
-    else:
-        plt.plot(upper_bound_mean, color='black', linestyle='dashed', label='Upper Bound')
+
+    plt.plot(upper_bound_mean, color='black', linestyle='dashed', label='Upper Bound')
 
     plt.xlabel('Steps')
     plt.ylabel('Average Reward')
