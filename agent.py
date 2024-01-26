@@ -177,3 +177,63 @@ class UCB(BanditAgent):
             stringified += r" $step\_size = 1 / N_t$"
         
         return stringified
+
+class GradientBandit(BanditAgent):
+    def __init__(self, k: int, init: int, step_size: float, verbose: bool = False) -> None:
+        """Gradient bandit agent
+
+        Args:
+            k (int): number of arms
+            init (init): initial value of Q-values
+            step_size (float): step size
+            verbose (bool): include additional information in string representation
+        """
+        super().__init__(k, init, step_size, verbose)
+        self.reset()
+    
+    def reset(self) -> None:
+        super().reset()
+        self.H = np.zeros(self.k)
+        self.pi = np.ones(self.k) / self.k # probability of choosing each action
+        self.average_reward = 0
+
+    def choose_action(self):
+        """Choose which arm to pull
+
+        Use softmax action selection. Sample from the probability distribution defined by the softmax function.
+        """
+        return np.random.choice(self.k, p=self.pi)
+       
+
+    def update(self, action: int, reward: float) -> None:
+        """Update Q-values and N after observing reward.
+
+        Args:
+            action (int): index of pulled arm
+            reward (float): reward obtained for pulling arm
+        """
+        self.t += 1
+
+        if self.t == 1:
+            self.average_reward = reward
+
+        # if reward greater than average reward, increase probability of choosing action and decrease probability of choosing all other actions
+        # if reward less than average reward, decrease probability of choosing action and increase probability of choosing all other actions
+        self.H[action] += self.step_size * (reward - self.average_reward) * (1 - self.pi[action]) # update preference for chosen action
+
+        for a in range(self.k):
+            if a != action:
+                self.H[a] -= self.step_size * (reward - self.average_reward) * self.pi[a] # update preference for all other actions
+
+        self.average_reward += (1 / self.t) * (reward - self.average_reward) # update average reward 
+
+        self.pi = np.exp(self.H) / np.sum(np.exp(self.H)) # update probabilities of choosing each action
+        
+    def __str__(self) -> str:
+        stringified = r"Gradient Bandit"
+        if self.step_size is not None:
+            stringified += r" $\alpha = {}$".format(self.step_size)
+        elif self.verbose:
+            stringified += r" $step\_size = 1 / N_t$"
+        
+        return stringified
