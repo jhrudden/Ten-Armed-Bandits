@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Optional, Sequence, Dict
+from typing import Optional, Sequence, Dict, Union
 from tqdm import trange
 
 from env import BanditEnv
@@ -62,7 +62,7 @@ def plot_bandit_reward_distributions(env: BanditEnv, num_pulls: int = 10_000, sa
     plt.show()
     
 
-def run_simulation(agents: Sequence[BanditAgent], env: BanditEnv, n_steps: int, n_trials: int) -> dict:
+def run_simulation(agents: Sequence[BanditAgent], env: BanditEnv, n_steps: int, n_trials: int, stationary: bool = True) -> Dict:
     """
     Run a simulation of the bandit environment with the given agents
 
@@ -71,6 +71,7 @@ def run_simulation(agents: Sequence[BanditAgent], env: BanditEnv, n_steps: int, 
         env (BanditEnv): bandit environment
         n_steps (int): number of steps to run
         n_trials (int): number of trials to run
+        stationary (bool): whether the environment is stationary
 
     Returns:
         dict: dictionary containing the results of the simulation
@@ -82,30 +83,41 @@ def run_simulation(agents: Sequence[BanditAgent], env: BanditEnv, n_steps: int, 
     data = {
         "took_optimal_action": np.zeros((len(agents), n_trials, n_steps)),
         "rewards": np.zeros((len(agents), n_trials, n_steps)),
-        "upper_bounds": np.zeros((n_trials, 1)),
     }
+
+
+    if stationary:
+        upper_bounds = np.zeros(n_trials)
+    else:
+        upper_bounds = np.zeros((n_trials, n_steps))
 
     for j in trange(n_trials):
         for i, agent in enumerate(agents):
             agent.reset()
             env.reset()
 
-            data["upper_bounds"][j] = np.max(env.means)
+            if stationary:
+                optimal_action = np.argmax(env.means)
+                upper_bounds[j] = env.means[optimal_action]
 
-            optimal_action = np.argmax(env.means)
 
             for t in range(n_steps):
                 action = agent.choose_action()
                 reward = env.step(action)
                 agent.update(action, reward)
 
+                if not stationary:
+                    optimal_action = np.argmax(env.means)
+                    upper_bounds[j, t] = env.means[optimal_action]
+
                 if action == optimal_action:
                     data["took_optimal_action"][i, j, t] = 1
 
                 data["rewards"][i, j, t] = reward
+    data['upper_bounds'] = upper_bounds
     return data
 
-def plot_optimal_action(data: np.ndarray, agent_labels: Sequence[str], alpha: float = 0.2, z_val: float = 1.96, save_path: Optional[str] = None):
+def plot_optimal_action(data: np.ndarray, agent_labels: Sequence[str], alpha: float = 0.2, z_val: float = 1.96, save_path: Optional[str] = None, figsize: Optional[Sequence[int]] = (20,10)):
     """
     Plot the percentage of optimal actions taken over time
 
@@ -115,11 +127,13 @@ def plot_optimal_action(data: np.ndarray, agent_labels: Sequence[str], alpha: fl
         alpha (float): transparency of the shaded region
         z_val (float): z-value for confidence interval
         save_path (Optional[str]): path to save the figure
+        figsize (Optional[Sequence[int]]): size of the figure
     """
     n_agents, n_trials, n_steps = data.shape
 
     assert n_agents == len(agent_labels), "Number of agents and labels must match"
 
+    plt.figure(figsize=figsize)
     for a in range(n_agents):
         scaled_data = data[a] * 100
         optimal_action_percentage = np.mean(scaled_data, axis=0)
@@ -146,21 +160,25 @@ def plot_optimal_action(data: np.ndarray, agent_labels: Sequence[str], alpha: fl
     plt.show()
 
 # TODO: what should the upper bound be?
-def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bounds: np.ndarray, alpha: float = 0.0, z_val: float = 1.96, save_path: Optional[str] = None):
+def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bounds: Union[np.ndarray, float], alpha: float = 0.0, z_val: float = 1.96, stationary: bool = True, save_path: Optional[str] = None, figsize: Optional[Sequence[int]] = (20,10)):
     """
     Plot the average reward over time
 
     Args:
         data (np.ndarray): data from simulation
         agent_labels (Sequence[str]): labels for each agent
-        upper_bounds (np.ndarray): upper bound of the highest average reward from the environment
+        upper_bounds (Union[np.ndarray, float]): upper bound of the highest possible average reward from the environment
         alpha (float): transparency of the shaded region
+        stationary (bool): whether the environment is stationary
         z_val (float): z-value for confidence interval
         save_path (Optional[str]): path to save the figure
+        figsize (Optional[Sequence[int]]): size of the figure
     """
     n_agents, n_trials, n_steps = data.shape
 
     assert n_agents == len(agent_labels), "Number of agents and labels must match"
+
+    plt.figure(figsize=figsize)
 
     for a in range(n_agents):
         average_reward_per_step = np.mean(data[a], axis=0)
@@ -177,7 +195,7 @@ def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bou
             color=series.get_color()
         )
 
-    upper_bound_mean = np.mean(upper_bounds)
+    upper_bound_mean = np.mean(upper_bounds, axis=None if stationary else 0)
     upper_bound_std = np.std(upper_bounds)
     margin_of_error_upper = z_val * upper_bound_std / np.sqrt(n_trials)
 
@@ -188,7 +206,10 @@ def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bou
         alpha=alpha,
         color='gray'
     )
-    plt.hlines(upper_bound_mean, 0, n_steps, color='black', linestyle='dashed', label='Upper Bound')
+    if stationary:
+        plt.hlines(upper_bound_mean, 0, n_steps, color='black', linestyle='dashed', label='Upper Bound')
+    else:
+        plt.plot(upper_bound_mean, color='black', linestyle='dashed', label='Upper Bound')
 
     plt.xlabel('Steps')
     plt.ylabel('Average Reward')
@@ -198,4 +219,4 @@ def plot_average_reward(data: np.ndarray, agent_labels: Sequence[str], upper_bou
     if save_path is not None:
         plt.savefig(save_path)
     
-    plt.show())
+    plt.show()
